@@ -2,6 +2,7 @@
 #include <Poco/Path.h>
 #include <Interpreters/Context.h>
 #include <Common/Exception.h>
+#include <IO/ReadHelpers.h>
 
 
 namespace DB
@@ -37,7 +38,7 @@ FormatSchemaInfo::FormatSchemaInfo(const Context & context, const String & forma
 
     size_t colon_pos = format_schema.find(':');
     Poco::Path path;
-    if ((colon_pos == String::npos) || (colon_pos == 0) || (colon_pos == format_schema.length() - 1)
+    if ((colon_pos == String::npos) || (colon_pos == 0) || (colon_pos == format_schema.length() - 1) || (colon_pos + 1 == '#')
         || path.assign(format_schema.substr(0, colon_pos)).makeFile().getFileName().empty())
     {
         throw Exception(
@@ -47,7 +48,17 @@ FormatSchemaInfo::FormatSchemaInfo(const Context & context, const String & forma
             ErrorCodes::BAD_ARGUMENTS);
     }
 
-    message_name = format_schema.substr(colon_pos + 1);
+    max_message_size = 0;
+    size_t size_pos = format_schema.find('#', colon_pos);
+    ++colon_pos;
+    if (size_pos != std::string::npos) {
+        if (size_pos != format_schema.length() - 1)
+            max_message_size = parse<UInt64>(format_schema.substr(size_pos + 1));
+    
+        size_pos -= colon_pos;
+    }
+
+    message_name = format_schema.substr(colon_pos, size_pos);
 
     auto default_schema_directory = [&context]()
     {

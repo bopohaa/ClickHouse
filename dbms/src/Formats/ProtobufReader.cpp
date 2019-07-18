@@ -51,11 +51,12 @@ namespace
 
 // SimpleReader is an utility class to deserialize protobufs.
 // Knows nothing about protobuf schemas, just provides useful functions to deserialize data.
-ProtobufReader::SimpleReader::SimpleReader(ReadBuffer & in_)
+ProtobufReader::SimpleReader::SimpleReader(ReadBuffer & in_, UInt64 max_message_size_)
     : in(in_)
     , cursor(1 /* We starts at cursor == 1 to keep any cursor value > REACHED_END, this allows to simplify conditions */)
     , current_message_end(REACHED_END)
     , field_end(REACHED_END)
+    , max_message_size(max_message_size_ > 0 ? max_message_size_ : UINT64_MAX)
 {
 }
 
@@ -67,6 +68,8 @@ bool ProtobufReader::SimpleReader::startMessage()
         if (unlikely(in.eof()))
             return false;
         size_t size_of_message = readVarint();
+        if(size_of_message > max_message_size)
+            unknownFormat();
         current_message_end = cursor + size_of_message;
     }
     else
