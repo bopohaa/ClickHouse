@@ -3,6 +3,11 @@
 namespace DB
 {
 
+namespace ErrorCodes
+{
+    extern const int UNKNOWN_EXCEPTION;
+}
+
 using namespace std::chrono_literals;
 ReadBufferFromKafkaConsumer::ReadBufferFromKafkaConsumer(
     ConsumerPtr consumer_, Poco::Logger * log_, size_t max_batch_size, size_t poll_timeout_, bool intermediate_commit_)
@@ -106,13 +111,7 @@ bool ReadBufferFromKafkaConsumer::nextImpl()
     }
 
     if (auto err = current->get_error())
-    {
-        ++current;
-
-        // TODO: should throw exception instead
-        LOG_ERROR(log, "Consumer error: " << err);
-        return false;
-    }
+        throw Exception("Consumer error: " + err.to_string(), ErrorCodes::UNKNOWN_EXCEPTION);
 
     // XXX: very fishy place with const casting.
     auto new_position = reinterpret_cast<char *>(const_cast<unsigned char *>(current->get_payload().get_data()));
